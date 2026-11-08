@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <memory>
 #include <new>
-#include <iostream>
 #include <cstdint>
 
 struct BlockHeader{
@@ -24,47 +23,57 @@ alignas(HEAP_ALIGNMENT) std::array<std::byte,HEAP_SIZE > heap{};
 BlockHeader * head {nullptr};
 BlockHeader * latest_header {nullptr};
 
-void * align(BlockHeader * header){
+size_t calculate_padding(std::uintptr_t address, size_t ALIGNMENT){
 
-
-	std::byte *current_ptr = reinterpret_cast<std::byte *> (head) + sizeof(BlockHeader) ;
-	std::uintptr_t address = reinterpret_cast<std::uintptr_t>(current_ptr);
 	std::size_t remainder = address % ALIGNMENT;
 	if(remainder == 0){
-		return current_ptr;
+		return 0;
 	}else {
-		size_t offset = ALIGNMENT - remainder;
-		current_ptr += offset;
-		return current_ptr;
+		size_t  offset = ALIGNMENT - remainder;
+		return offset;
 	}
 
+}
 
-	return nullptr;
+std::byte * align(std::byte * current_ptr, size_t alignment){
+
+
+	std::uintptr_t address = reinterpret_cast<std::uintptr_t>(current_ptr);
+	size_t offset =calculate_padding(address, ALIGNMENT);
+	current_ptr += offset;
+	return current_ptr;
 }
 
 void * my_alloc(size_t size){
 
-
 	BlockHeader * current;
+
 	if (!head){
-		head = new (heap.data()) BlockHeader{HEAP_SIZE - sizeof(BlockHeader), true, nullptr};
+		head = new (heap.data()) BlockHeader{size, false, nullptr};
 		current = head;
+        }else{
+		while (current){
+			current =current->next;
+		}
+		current = new (heap.data()) BlockHeader{size, false, nullptr};
         }
 
-        void * aligned_ptr = align(current);
 
-	void * next_header_ptr = reinterpret_cast<std::byte *> (aligned_ptr) + size ;
+	//Convert pointer to a byte pointer then find the correct allignment for the paylod
+	std::byte *  end_of_header= reinterpret_cast<std::byte*>(current);
+        std::byte * start_of_payload = align(end_of_header,ALIGNMENT);
 
-	current->next = static_cast<BlockHeader*>(next_header_ptr);
-	current->free = false;
+	//Find the end of the payload to then add the necessary padding needing to initalize the next header
+	std::byte * end_of_payload = reinterpret_cast<std::byte *> (start_of_payload) + size;
+	std::byte * begining_of_next_header = align(end_of_payload,ALIGNMENT);
 
-	return aligned_ptr;
+	current->next = reinterpret_cast<BlockHeader*>(begining_of_next_header);
+
+	return start_of_payload;
 }
 
 void * my_dealloc(){
 
-
-	my_alloc(4);
 	return nullptr;
 
 }
