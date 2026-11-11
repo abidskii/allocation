@@ -1,7 +1,9 @@
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <new>
 #include <cstdint>
@@ -48,6 +50,8 @@ void * my_alloc(size_t size){
 
 	BlockHeader * current;
 
+
+
 	if (!head){
 		head = new (heap.data()) BlockHeader{size, false, nullptr};
 		current = head;
@@ -68,6 +72,9 @@ void * my_alloc(size_t size){
 	std::byte * begining_of_next_header = align(end_of_payload,ALIGNMENT);
 
 	current->next = reinterpret_cast<BlockHeader*>(begining_of_next_header);
+
+	//Test
+	assert(reinterpret_cast<std::uintptr_t>(current->next) % alignof(BlockHeader)==0);
 
 	return start_of_payload;
 }
