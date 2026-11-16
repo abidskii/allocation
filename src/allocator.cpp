@@ -125,8 +125,3 @@ void *my_alloc(size_t size) {
 }
 
 void *my_dealloc() { return nullptr; }
-
-int main() {
-        void *num = my_alloc(4);
-        return 0;
-}
