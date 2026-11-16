@@ -105,7 +105,7 @@ void *my_alloc(size_t size) {
                 // Space remaining for another block
                 size_t remaining_size = current->size - padded_block_size;
 
-                if (remaining_size >= HEADER_SIZE) {
+                if (remaining_size > HEADER_SIZE) {
 
                         std::byte *beginning_of_next_header =
                             end_of_payload + offset;
