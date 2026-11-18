@@ -1,12 +1,12 @@
+#include "allocator.hpp"
 #include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <iterator>
-#include <memory>
 #include <new>
 
+namespace {
 struct BlockHeader {
 
         size_t size;
@@ -14,10 +14,8 @@ struct BlockHeader {
         BlockHeader *next;
 };
 
-constexpr std::size_t HEAP_SIZE{1024 * 1024};
 constexpr std::size_t HEAP_ALIGNMENT =
     std::max(alignof(std::max_align_t), alignof(BlockHeader));
-constexpr std::size_t ALIGNMENT = alignof(std::max_align_t);
 constexpr std::size_t HEADER_SIZE =
     ((sizeof(BlockHeader) + ALIGNMENT - 1) / ALIGNMENT) * ALIGNMENT;
 
@@ -25,6 +23,8 @@ alignas(HEAP_ALIGNMENT) std::array<std::byte, HEAP_SIZE> heap{};
 
 BlockHeader *head{nullptr};
 BlockHeader *latest_header{nullptr};
+
+} // namespace
 
 size_t calculate_padding(std::uintptr_t address, size_t ALIGNMENT) {
 
@@ -123,5 +123,9 @@ void *my_alloc(size_t size) {
 
         return start_of_payload;
 }
+
+void reset_allocator() { head = nullptr; }
+
+std::size_t allocator_max_payload_size() { return HEAP_SIZE - HEADER_SIZE; }
 
 void *my_dealloc() { return nullptr; }
