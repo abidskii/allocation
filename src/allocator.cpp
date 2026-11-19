@@ -24,8 +24,6 @@ alignas(HEAP_ALIGNMENT) std::array<std::byte, HEAP_SIZE> heap{};
 BlockHeader *head{nullptr};
 BlockHeader *latest_header{nullptr};
 
-} // namespace
-
 size_t calculate_padding(std::uintptr_t address, size_t ALIGNMENT) {
 
         std::size_t remainder = address % ALIGNMENT;
@@ -40,14 +38,32 @@ size_t calculate_padding(std::uintptr_t address, size_t ALIGNMENT) {
 size_t calculate_alignment_offset(std::byte *current_ptr, size_t alignment) {
 
         std::uintptr_t address = reinterpret_cast<std::uintptr_t>(current_ptr);
-        size_t offset = calculate_padding(address, ALIGNMENT);
+        size_t offset = calculate_padding(address, alignment);
         return offset;
 }
+
+std::byte *allocate_header(BlockHeader *current, size_t *block_size) {
+
+        // Convert pointer to a byte pointer then find the correct
+        // allignment for the paylod
+        std::byte *start_of_header = reinterpret_cast<std::byte *>(current);
+        std::byte *end_of_header = start_of_header + sizeof(BlockHeader);
+        *block_size += sizeof(BlockHeader);
+        size_t offset = calculate_alignment_offset(end_of_header, ALIGNMENT);
+        std::byte *start_of_payload = end_of_header + offset;
+        *block_size += offset;
+        return start_of_payload;
+}
+
+std::byte *get_payload_start(BlockHeader *current) {
+        return reinterpret_cast<std::byte *>(current) + HEADER_SIZE;
+}
+
+} // namespace
 
 void *my_alloc(size_t size) {
 
         BlockHeader *current;
-        size_t block_size = 0;
 
         if (!head) {
                 head = new (heap.data()) BlockHeader{HEAP_SIZE, true, nullptr};
@@ -55,47 +71,43 @@ void *my_alloc(size_t size) {
 
         current = head;
 
-        while (current->next != nullptr) {
+        while (current != nullptr) {
+                if (current->free) {
+                        if (current->size >= HEADER_SIZE) {
+
+                                std::size_t available_payload =
+                                    current->size - HEADER_SIZE;
+
+                                if (size <= available_payload) {
+                                        break;
+                                }
+                        }
+                }
                 current = current->next;
         }
 
-        if (!current->free) {
+        if (current == nullptr) {
                 return nullptr;
         }
 
-        // Convert pointer to a byte pointer then find the correct allignment
-        // for the paylod
-        std::byte *start_of_header = reinterpret_cast<std::byte *>(current);
-        std::byte *end_of_header = start_of_header + sizeof(BlockHeader);
-        block_size += sizeof(BlockHeader);
-        size_t offset = calculate_alignment_offset(end_of_header, ALIGNMENT);
-        std::byte *start_of_payload = end_of_header + offset;
-        block_size += offset;
+        // Verify that the selected header is aligned.
+        assert(reinterpret_cast<std::uintptr_t>(current) % ALIGNMENT == 0);
 
-        // We need to check what free space there is after the header and see it
-        // there is enoungh space to allocate
-        if (block_size > current->size) {
-                return nullptr;
-        }
-        size_t size_without_header = current->size - block_size;
-        if (size > size_without_header) {
-                return nullptr;
-        }
+        std::byte *start_of_payload = get_payload_start(current);
 
-        // Find the end of the payload to then add the necessary padding needing
-        // to initalize the next header
-        std::byte *end_of_payload = (start_of_payload) + size;
-        block_size += size;
+        std::size_t block_size = HEADER_SIZE + size;
+
+        std::byte *end_of_payload = start_of_payload + size;
 
         current->free = false;
 
         // At this point, block_size includes:
         // original header + padding + requested payload
-
         size_t space_after_payload = current->size - block_size;
 
         // Padding needed to align the next header
-        offset = calculate_alignment_offset(end_of_payload, ALIGNMENT);
+        //
+        size_t offset = calculate_alignment_offset(end_of_payload, ALIGNMENT);
 
         // Only attempt to split if the padding fits
         if (offset <= space_after_payload) {
@@ -116,7 +128,7 @@ void *my_alloc(size_t size) {
                         current->size = padded_block_size;
 
                         assert(reinterpret_cast<std::uintptr_t>(current->next) %
-                                   alignof(BlockHeader) ==
+                                   ALIGNMENT ==
                                0);
                 }
         }
@@ -128,4 +140,33 @@ void reset_allocator() { head = nullptr; }
 
 std::size_t allocator_max_payload_size() { return HEAP_SIZE - HEADER_SIZE; }
 
-void *my_dealloc() { return nullptr; }
+void my_dealloc(void *current) {
+
+        if (current == nullptr) {
+                return;
+        }
+
+        BlockHeader *ptr = head;
+
+        std::uintptr_t current_address =
+            reinterpret_cast<std::uintptr_t>(current);
+
+        while (ptr != nullptr) {
+
+                std::byte *payload_start = get_payload_start(ptr);
+                std::uintptr_t address_ptr =
+                    reinterpret_cast<std::uintptr_t>(payload_start);
+                if (current_address == address_ptr) {
+                        break;
+                }
+                ptr = ptr->next;
+        }
+
+        if (ptr == nullptr) {
+                return;
+        }
+
+        if (!ptr->free) {
+                ptr->free = true;
+        }
+}

@@ -19,7 +19,7 @@ TEST_F(AllocatorTest, BasicAllocation) {
 TEST_F(AllocatorTest, PayloadAlignment) {
 
         void *ptr = my_alloc(13);
-        EXPECT_NE(ptr, nullptr);
+        ASSERT_NE(ptr, nullptr);
 
         std::uintptr_t address = reinterpret_cast<std::uintptr_t>(ptr);
         EXPECT_EQ(address % ALIGNMENT, 0u);
@@ -63,13 +63,13 @@ TEST_F(AllocatorTest, AllocationLargerThanHeap) {
 
 TEST_F(AllocatorTest, ExactFitAllocation) {
 
-        std::size_t header_size = allocator_max_payload_size();
+        std::size_t capacity = allocator_max_payload_size();
 
-        void *ptr1 = my_alloc(header_size);
+        void *ptr1 = my_alloc(capacity);
 
         EXPECT_NE(ptr1, nullptr);
 
-        void *ptr2 = my_alloc(10);
+        void *ptr2 = my_alloc(1);
         EXPECT_EQ(ptr2, nullptr);
 }
 
@@ -86,5 +86,5 @@ TEST_F(AllocatorTest, FailedAllocationPreservesHeap) {
 
         EXPECT_EQ(my_alloc(capacity + 1), nullptr);
 
-        EXPECT_NE(my_alloc(64), nullptr);
+        EXPECT_NE(my_alloc(capacity), nullptr);
 }
