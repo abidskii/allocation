@@ -2,7 +2,6 @@
 #include "gtest/gtest.h"
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 
 class AllocatorTest : public ::testing::Test {
 
@@ -36,7 +35,7 @@ TEST_F(AllocatorTest, MultipleAllocations) {
         EXPECT_NE(ptr1, ptr2);
 }
 
-TEST_F(AllocatorTest, NonOverlappintAllocations) {
+TEST_F(AllocatorTest, NonOverlappingAllocations) {
 
         auto *ptr1 = static_cast<std::byte *>(my_alloc(13));
         auto *ptr2 = static_cast<std::byte *>(my_alloc(20));
@@ -141,4 +140,79 @@ TEST_F(AllocatorTest, DoubleFree) {
 
         ASSERT_EQ(ptr3, ptr1);
         ASSERT_NE(ptr3, ptr2);
+}
+
+TEST_F(AllocatorTest, CoalesceTwoAdjacentBlocks) {
+
+        void *ptr1 = my_alloc(128);
+        void *ptr2 = my_alloc(128);
+        void *ptr3 = my_alloc(128);
+        void *ptr5 = my_alloc(128);
+
+        ASSERT_NE(ptr1, nullptr);
+        ASSERT_NE(ptr2, nullptr);
+        ASSERT_NE(ptr3, nullptr);
+        ASSERT_NE(ptr5, nullptr);
+
+        my_free(ptr3);
+        my_free(ptr2);
+
+        void *ptr4 = my_alloc(130);
+        ASSERT_NE(ptr4, nullptr);
+
+        ASSERT_EQ(ptr4, ptr2);
+}
+
+TEST_F(AllocatorTest, CoalesceThreeAdjacentBlocks) {
+        void *ptr1 = my_alloc(128);
+        void *ptr2 = my_alloc(128);
+        void *ptr3 = my_alloc(128);
+        void *ptr4 = my_alloc(390);
+
+        ASSERT_NE(ptr1, nullptr);
+        ASSERT_NE(ptr2, nullptr);
+        ASSERT_NE(ptr3, nullptr);
+        ASSERT_NE(ptr4, nullptr);
+
+        my_free(ptr1);
+        my_free(ptr2);
+        my_free(ptr3);
+
+        void *ptr5 = my_alloc(390);
+        ASSERT_NE(ptr5, nullptr);
+
+        ASSERT_EQ(ptr5, ptr1);
+}
+
+TEST_F(AllocatorTest, NonAdjacentFreeBlocksPreserveAllocatedData) {
+        void *ptr1 = my_alloc(128);
+        void *ptr2 = my_alloc(128);
+        void *ptr3 = my_alloc(128);
+        void *ptr4 = my_alloc(390);
+        void *ptr5 = my_alloc(128);
+
+        ASSERT_NE(ptr1, nullptr);
+        ASSERT_NE(ptr2, nullptr);
+        ASSERT_NE(ptr3, nullptr);
+        ASSERT_NE(ptr4, nullptr);
+        ASSERT_NE(ptr5, nullptr);
+
+        std::byte *data = reinterpret_cast<std::byte *>(ptr3);
+        for (std::size_t i = 0; i < 128; i++) {
+
+                data[i] = std::byte{static_cast<unsigned char>(i)};
+        }
+
+        my_free(ptr2);
+        my_free(ptr4);
+
+        void *ptr6 = my_alloc(390);
+        ASSERT_NE(ptr6, nullptr);
+
+        ASSERT_EQ(ptr6, ptr4);
+
+        for (std::size_t i = 0; i < 128; i++) {
+
+                ASSERT_EQ(data[i], std::byte{static_cast<unsigned char>(i)});
+        }
 }
