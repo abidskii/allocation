@@ -59,6 +59,8 @@ std::byte *get_payload_start(BlockHeader *current) {
         return reinterpret_cast<std::byte *>(current) + HEADER_SIZE;
 }
 
+void coalesce_free_blocks() {}
+
 } // namespace
 
 void *my_alloc(size_t size) {
@@ -140,7 +142,7 @@ void reset_allocator() { head = nullptr; }
 
 std::size_t allocator_max_payload_size() { return HEAP_SIZE - HEADER_SIZE; }
 
-void my_dealloc(void *current) {
+void my_free(void *current) {
 
         if (current == nullptr) {
                 return;
@@ -169,4 +171,6 @@ void my_dealloc(void *current) {
         if (!ptr->free) {
                 ptr->free = true;
         }
+
+        coalesce_free_blocks();
 }
