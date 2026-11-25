@@ -71,11 +71,6 @@ The tests verify allocation behavior, memory alignment, block reuse, coalescing,
 
 Testing
 --------
-Google test was used to write tests and CTest was used to run them.
-
-The test suite covers:
-
-## Testing
 
 GoogleTest is used to write unit tests for the allocator, while CTest is used to execute the test suite.
 
